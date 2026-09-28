@@ -270,7 +270,7 @@ function fitMap(force){
 /* ---------- licencias ---------- */
 async function loadLicenses(){
   const { data, error } = await sb.from('user_licenses')
-    .select('id, device_label, tier, expires_at, hardware_id, is_active, notes, last_seen_at, app_version, in_foreground, last_lat, last_lng, last_accuracy, location_at, location_requested, location_requested_at, email, pending, registered_at')
+    .select('id, device_label, tier, expires_at, hardware_id, is_active, block_reason, last_seen_at, app_version, in_foreground, last_lat, last_lng, last_accuracy, location_at, location_requested, location_requested_at, email, pending, registered_at')
     .order('last_seen_at',{ascending:false,nullsFirst:false});
   if(error){ document.getElementById('listMsg').textContent='Error: '+error.message; return; }
   licenses = data; renderTable(); renderMap();
@@ -335,7 +335,7 @@ function renderTable(){
       <td>${loc}</td>
       <td>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠</span>':''}</td>
       <td><span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
-          ${!l.is_active&&l.notes?`<div class="muted">${esc(l.notes)}</div>`:''}</td>
+          ${!l.is_active&&l.block_reason?`<div class="muted">${esc(l.block_reason)}</div>`:''}</td>
       <td class="row-actions">
         <button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>
         <button class="btn-${l.is_active?'danger':'primary'}" onclick="toggleActive('${l.id}', ${!l.is_active})">${l.is_active?'Bloquear':'Activar'}</button>
@@ -354,22 +354,22 @@ async function toggleActive(id, newValue){
   if(newValue===false){
     const reason=prompt('Motivo del bloqueo (se mostrará al usuario, opcional):','');
     if(reason===null) return;
-    return upd(id,{ is_active:false, pending:false, notes:reason.trim()||null });
+    return upd(id,{ is_active:false, pending:false, block_reason:reason.trim()||null });
   }
-  return upd(id,{ is_active:true, notes:null });
+  return upd(id,{ is_active:true, block_reason:null });
 }
 async function approveAccount(id){
   const d = draft[id] || { tier:'pro', days:'' };
   const days = parseInt(d.days,10);
   if(!days || days < 1){ alert('Escribe cuántos días de licencia le das a este usuario.'); return; }
   await upd(id,{ is_active:true, pending:false, tier:d.tier,
-                 expires_at:new Date(Date.now()+days*86400000).toISOString(), notes:null });
+                 expires_at:new Date(Date.now()+days*86400000).toISOString(), block_reason:null });
   delete draft[id];
 }
 async function rejectAccount(id){
   const reason = prompt('Motivo del rechazo (se mostrará al usuario, opcional):','');
   if(reason===null) return;
-  await upd(id,{ is_active:false, pending:false, notes:reason.trim()||null });
+  await upd(id,{ is_active:false, pending:false, block_reason:reason.trim()||null });
   delete draft[id];
 }
 async function releaseDevice(id){
@@ -397,7 +397,7 @@ async function activateDevice(){
   const { data:existing, error:selErr } = await sb.from('user_licenses').select('id').eq('hardware_id',code).maybeSingle();
   if(selErr){ msg.textContent='Error: '+selErr.message; return; }
   let error;
-  if(existing) ({ error } = await sb.from('user_licenses').update({ tier,is_active:true,expires_at:expires,device_label:label||undefined,notes:null }).eq('id',existing.id));
+  if(existing) ({ error } = await sb.from('user_licenses').update({ tier,is_active:true,expires_at:expires,device_label:label||undefined,block_reason:null }).eq('id',existing.id));
   else ({ error } = await sb.from('user_licenses').insert({ hardware_id:code,device_label:label||null,tier,is_active:true,expires_at:expires }));
   if(error){ msg.textContent='Error: '+error.message; return; }
   msg.textContent='Dispositivo activado ✔';
