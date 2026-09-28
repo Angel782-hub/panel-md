@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+<title>Panel de Licencias · MetricDrivers</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--border:#262a33;--text:#e8eaed;--muted:#9aa1ab;
+        --accent:#3ecf8e;--danger:#ef4444;--warn:#f59e0b;--gray:#6b7280}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0}
+  main{max-width:1250px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px}
+  input,button,select{font:inherit}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],select{
+    background:#0f1115;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%}
+  table input[type=text]{min-width:120px}
+  button{cursor:pointer;border:none;border-radius:6px;padding:8px 14px;font-weight:600}
+  .btn-primary{background:var(--accent);color:#00291b}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-warn{background:var(--warn);color:#2a1900}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;white-space:nowrap}
+  code{font-size:12px;word-break:break-all}
+  .pill{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pill-ok{background:#12331f;color:#3ecf8e}.pill-off{background:#331212;color:#ef4444}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .login-box{max-width:360px;margin:80px auto}
+  .muted{color:var(--muted);font-size:13px}
+  #app{display:none}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .stats{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{background:#0f1115;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px}
+  .stat b{font-size:16px;margin-right:4px}
+  #map{height:380px;border-radius:8px;border:1px solid var(--border)}
+  a{color:var(--accent)}
+  @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <h2 style="margin-top:0">Panel de Licencias</h2>
+  <p class="muted">Inicia sesión con tu cuenta de administrador.</p>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <input id="email" type="email" value="angeljs6819@gmail.com" />
+    <input id="password" type="password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
+    <button class="btn-primary" onclick="login()">Entrar</button>
+    <div id="loginMsg" class="muted"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>🔐 Panel de Licencias — MetricDrivers</h1>
+    <div class="stats" id="stats"></div>
+    <button class="btn-ghost" onclick="logout()">Cerrar sesión</button>
+  </header>
+
+  <main>
+    <!-- Activar dispositivo -->
+    <div class="card">
+      <h3 style="margin-top:0">Activar dispositivo</h3>
+      <p class="muted" style="margin-top:0">Pega el código que te mandó el usuario desde su app (formato XXXXX-XXXXX-XXXXX-XXXXX-XXXXX).</p>
+      <div class="grid2">
+        <div><label class="muted">Código del dispositivo</label>
+          <input id="actCode" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" style="font-family:monospace;letter-spacing:1px" /></div>
+        <div><label class="muted">Nombre / referencia (opcional)</label>
+          <input id="actLabel" type="text" placeholder="Ej. Juan Pérez" /></div>
+        <div><label class="muted">Plan</label>
+          <select id="actTier"><option value="free">free</option><option value="pro" selected>pro</option><option value="pro_plus">pro_plus</option></select></div>
+        <div><label class="muted">Duración (días)</label>
+          <input id="actDays" type="number" value="30" min="1" /></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" onclick="activateDevice()">Activar dispositivo</button>
+        <span id="actMsg" class="muted"></span>
+      </div>
+    </div>
+
+    <!-- Mapa -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <h3 style="margin:0">Ubicación de dispositivos</h3>
+        <div class="muted">
+          <span class="dot" style="background:#3ecf8e"></span>En uso
+          <span class="dot" style="background:#f59e0b;margin-left:10px"></span>Segundo plano
+          <span class="dot" style="background:#6b7280;margin-left:10px"></span>Desconectado
+          <span class="dot" style="background:#ef4444;margin-left:10px"></span>Bloqueado
+          <button class="btn-ghost" style="margin-left:12px;padding:4px 10px" onclick="fitMap(true)">Centrar</button>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="muted" id="mapMsg" style="margin-top:6px"></div>
+      <div class="muted">La ubicación solo se actualiza cuando pulsas «📍 Ubicación» en la tabla de dispositivos. La solicitud caduca a los 10 minutos.</div>
+    </div>
+
+    <!-- Licencias -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <h3 style="margin:0">Dispositivos y licencias</h3>
+        <input id="searchBox" type="text" placeholder="Buscar por nombre o código…" style="width:280px" oninput="renderTable()" />
+      </div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table>
+          <thead><tr>
+            <th>Conexión</th><th>Nombre</th><th>Plan</th><th>Vence</th><th>Código</th>
+            <th>Ubicación</th><th>App</th><th>Licencia</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="listMsg" class="muted" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Configuración -->
+    <div class="card">
+      <h3 style="margin-top:0">Configuración de la app</h3>
+      <div class="grid2">
+        <div><label class="muted">Versión mínima requerida</label><input id="cfgMinVersion" type="text" placeholder="1.2.0" /></div>
+        <div><label class="muted">Última versión disponible</label><input id="cfgLatestVersion" type="text" placeholder="1.2.0" /></div>
+        <div><label class="muted">Archivo APK (se sube a Supabase Storage, máx. 50 MB)</label>
+          <input id="cfgApkFile" type="file" accept=".apk" />
+          <div id="cfgApkCurrent" class="muted" style="margin-top:4px"></div></div>
+        <div><label class="muted">…o pega un enlace directo al APK (si pesa más de 50 MB)</label>
+          <input id="cfgApkUrl" type="text" placeholder="https://github.com/.../releases/download/v1.2.0/app.apk" /></div>
+        <div style="grid-column:1/-1"><label class="muted">Mensaje (opcional, se muestra al usuario)</label>
+          <input id="cfgMessage" type="text" placeholder="Corrige errores y agrega soporte para..." /></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <label><input id="cfgForceUpdate" type="checkbox" /> Forzar actualización (bloquea la app hasta actualizar)</label>
+        <label><input id="cfgMaintenance" type="checkbox" /> Modo mantenimiento (bloquea TODAS las apps)</label>
+        <button class="btn-primary" onclick="saveConfig()">Guardar configuración</button>
+        <span id="cfgMsg" class="muted"></span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL = "https://fjfefkixemfcixjuefqk.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_MYOied1D7gjo9NMX0qqDoQ_jTJ303eE";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const ONLINE_MS = 150000;       // visto en los últimos 2.5 min = conectado (heartbeat de la app: 60 s)
+const REFRESH_MS = 5000;        // el panel se actualiza solo cada 5 s
+const COLORS = { use:'#3ecf8e', bg:'#f59e0b', off:'#6b7280', blocked:'#ef4444' };
+
+let licenses = [], cfg = null, map = null, layer = null, fitted = false, timer = null;
+
+/* ---------- utilidades ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ago(ts){
+  if(!ts) return '—';
+  const s = Math.max(0, Math.round((Date.now()-new Date(ts).getTime())/1000));
+  if(s<60) return `hace ${s} s`; if(s<3600) return `hace ${Math.floor(s/60)} min`;
+  if(s<86400) return `hace ${Math.floor(s/3600)} h`; return `hace ${Math.floor(s/86400)} d`;
+}
+function presence(l){
+  if(!l.last_seen_at) return 'off';
+  const age = Date.now()-new Date(l.last_seen_at).getTime();
+  if(age > ONLINE_MS) return 'off';
+  return l.in_foreground ? 'use' : 'bg';
+}
+const presenceText = { use:'En uso', bg:'Segundo plano', off:'Desconectado' };
+function verLt(a,b){
+  const pa=String(a||'0').split(/[.\-]/).map(n=>parseInt(n)||0), pb=String(b||'0').split(/[.\-]/).map(n=>parseInt(n)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){const x=pa[i]||0,y=pb[i]||0; if(x!==y) return x<y;} return false;
+}
+function normalizeCode(raw){
+  const c=(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,''); return c.length===25 ? c.match(/.{5}/g).join('-') : null;
+}
+
+/* ---------- sesión ---------- */
+async function checkSession(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ showApp(); loadAll(); }
+}
+async function login(){
+  const msg=document.getElementById('loginMsg'); msg.textContent='Entrando…';
+  const { error } = await sb.auth.signInWithPassword({
+    email:document.getElementById('email').value.trim(), password:document.getElementById('password').value });
+  if(error){ msg.textContent='Error: '+error.message; return; }
+  showApp(); loadAll();
+}
+async function logout(){
+  clearInterval(timer); await sb.auth.signOut();
+  document.getElementById('app').style.display='none'; document.getElementById('login').style.display='block';
+}
+function showApp(){
+  document.getElementById('login').style.display='none'; document.getElementById('app').style.display='block';
+  initMap();
+}
+async function loadAll(){
+  await loadConfig(); await loadLicenses();
+  clearInterval(timer);
+  timer = setInterval(()=>{ if(!isEditing()){ loadLicenses(); } }, REFRESH_MS);
+}
+function isEditing(){
+  const a=document.activeElement;
+  return a && a.closest && a.closest('#tbody') && ['INPUT','SELECT'].includes(a.tagName);
+}
+
+/* ---------- mapa ---------- */
+function initMap(){
+  if(map) { setTimeout(()=>map.invalidateSize(),100); return; }
+  map = L.map('map').setView([19.43,-99.13],5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  setTimeout(()=>map.invalidateSize(),200);
+}
+function renderMap(){
+  if(!map) return;
+  layer.clearLayers();
+  const pts=[];
+  licenses.forEach(l=>{
+    if(l.last_lat==null || l.last_lng==null) return;
+    const st = !l.is_active ? 'blocked' : presence(l);
+    const m = L.circleMarker([l.last_lat,l.last_lng],{radius:9,color:'#fff',weight:2,fillColor:COLORS[st],fillOpacity:.95}).addTo(layer);
+    m.bindPopup(`<b>${esc(l.device_label||'Sin nombre')}</b><br><code>${esc(l.hardware_id)}</code><br>
+      ${st==='blocked'?'Bloqueado':presenceText[st]}<br>Ubicación obtenida ${ago(l.location_at)}<br>Precisión: ${l.last_accuracy?Math.round(l.last_accuracy)+' m':'—'}`);
+    pts.push([l.last_lat,l.last_lng]);
+  });
+  document.getElementById('mapMsg').textContent = pts.length
+    ? `${pts.length} dispositivo(s) con ubicación.` : 'Aún no has solicitado la ubicación de ningún dispositivo. Pulsa «📍 Ubicación» en la tabla.';
+  if(pts.length && !fitted){ fitMap(false); fitted=true; }
+}
+function fitMap(force){
+  const pts=licenses.filter(l=>l.last_lat!=null).map(l=>[l.last_lat,l.last_lng]);
+  if(!pts.length) return;
+  if(pts.length===1) map.setView(pts[0],15); else map.fitBounds(pts,{padding:[40,40]});
+}
+
+/* ---------- licencias ---------- */
+async function loadLicenses(){
+  const { data, error } = await sb.from('user_licenses')
+    .select('id, device_label, tier, expires_at, hardware_id, is_active, notes, last_seen_at, app_version, in_foreground, last_lat, last_lng, last_accuracy, location_at, location_requested, location_requested_at')
+    .order('last_seen_at',{ascending:false,nullsFirst:false});
+  if(error){ document.getElementById('listMsg').textContent='Error: '+error.message; return; }
+  licenses = data; renderTable(); renderMap();
+}
+function renderStats(){
+  const c={use:0,bg:0,off:0}; let blocked=0;
+  licenses.forEach(l=>{ c[presence(l)]++; if(!l.is_active) blocked++; });
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><b>${licenses.length}</b>total</div>
+     <div class="stat"><b style="color:${COLORS.use}">${c.use}</b>en uso</div>
+     <div class="stat"><b style="color:${COLORS.bg}">${c.bg}</b>2º plano</div>
+     <div class="stat"><b style="color:#9aa1ab">${c.off}</b>desconectados</div>
+     <div class="stat"><b style="color:${COLORS.blocked}">${blocked}</b>bloqueados</div>`;
+}
+function renderTable(){
+  renderStats();
+  const term=document.getElementById('searchBox').value.toLowerCase();
+  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
+  licenses.filter(l=>!term||(l.device_label||'').toLowerCase().includes(term)||(l.hardware_id||'').toLowerCase().includes(term))
+  .forEach(l=>{
+    const p=presence(l), expired=l.expires_at&&new Date(l.expires_at)<new Date();
+    const outdated = cfg && l.app_version && verLt(l.app_version, cfg.min_version);
+    const waitingMs = l.location_requested_at ? Date.now()-new Date(l.location_requested_at).getTime() : 0;
+    const noReply = l.location_requested && waitingMs > 180000;
+    let loc = (l.last_lat!=null)
+      ? `<a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${l.last_lat},${l.last_lng}">Ver mapa</a><div class="muted">obtenida ${ago(l.location_at)}</div>`
+      : '<span class="muted">Sin solicitar</span>';
+    if (l.location_requested) loc = noReply
+      ? `<span style="color:var(--warn)">Sin respuesta</span><div class="muted">¿desconectado o sin permiso de ubicación?</div>` + (l.last_lat!=null?loc:'')
+      : `<span style="color:var(--warn)">⏳ Solicitando…</span>` + (l.last_lat!=null?`<div class="muted">anterior: ${ago(l.location_at)}</div>`:'');
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><span class="dot" style="background:${COLORS[p]}"></span>${presenceText[p]}<div class="muted">${ago(l.last_seen_at)}</div></td>
+      <td><input type="text" value="${esc(l.device_label)}" placeholder="Sin nombre" onchange="updateLabel('${l.id}', this.value)" /></td>
+      <td><select onchange="updateTier('${l.id}', this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${l.tier===t?'selected':''}>${t}</option>`).join('')}</select></td>
+      <td><input type="date" value="${l.expires_at?l.expires_at.substring(0,10):''}" onchange="updateExpiry('${l.id}', this.value)" /></td>
+      <td><code>${esc(l.hardware_id)}</code></td>
+      <td>${loc}</td>
+      <td>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠</span>':''}</td>
+      <td><span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
+          ${!l.is_active&&l.notes?`<div class="muted">${esc(l.notes)}</div>`:''}</td>
+      <td class="row-actions">
+        <button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>
+        <button class="btn-${l.is_active?'danger':'primary'}" onclick="toggleActive('${l.id}', ${!l.is_active})">${l.is_active?'Bloquear':'Activar'}</button>
+        <button class="btn-ghost" onclick="deleteLicense('${l.id}')">Eliminar</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+async function upd(id, patch){
+  const { error } = await sb.from('user_licenses').update(patch).eq('id', id);
+  if(error) return alert('Error: '+error.message);
+  await loadLicenses();
+}
+async function toggleActive(id, newValue){
+  if(newValue===false){
+    const reason=prompt('Motivo del bloqueo (se mostrará al usuario, opcional):','');
+    if(reason===null) return;
+    return upd(id,{ is_active:false, notes:reason.trim()||null });
+  }
+  return upd(id,{ is_active:true, notes:null });
+}
+const requestLocation = id => upd(id,{ location_requested:true, location_requested_at:new Date().toISOString() });
+const updateTier  = (id,v)=>upd(id,{ tier:v });
+const updateLabel = (id,v)=>upd(id,{ device_label:v.trim()||null });
+function updateExpiry(id,d){ if(!d) return; return upd(id,{ expires_at:new Date(d+'T23:59:59Z').toISOString() }); }
+async function deleteLicense(id){
+  if(!confirm('¿Eliminar esta licencia? El dispositivo quedará sin activar y la app se bloqueará.')) return;
+  const { error } = await sb.from('user_licenses').delete().eq('id', id);
+  if(error) return alert('Error: '+error.message);
+  await loadLicenses();
+}
+async function activateDevice(){
+  const msg=document.getElementById('actMsg');
+  const code=normalizeCode(document.getElementById('actCode').value);
+  const label=document.getElementById('actLabel').value.trim();
+  const tier=document.getElementById('actTier').value;
+  const days=parseInt(document.getElementById('actDays').value,10)||30;
+  if(!code){ msg.textContent='Código inválido: debe tener 25 caracteres (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX).'; return; }
+  const expires=new Date(Date.now()+days*86400000).toISOString();
+  const { data:existing, error:selErr } = await sb.from('user_licenses').select('id').eq('hardware_id',code).maybeSingle();
+  if(selErr){ msg.textContent='Error: '+selErr.message; return; }
+  let error;
+  if(existing) ({ error } = await sb.from('user_licenses').update({ tier,is_active:true,expires_at:expires,device_label:label||undefined,notes:null }).eq('id',existing.id));
+  else ({ error } = await sb.from('user_licenses').insert({ hardware_id:code,device_label:label||null,tier,is_active:true,expires_at:expires }));
+  if(error){ msg.textContent='Error: '+error.message; return; }
+  msg.textContent='Dispositivo activado ✔';
+  document.getElementById('actCode').value=''; document.getElementById('actLabel').value='';
+  await loadLicenses();
+}
+
+/* ---------- configuración ---------- */
+async function loadConfig(){
+  const { data, error } = await sb.from('app_config').select('*').eq('id',1).single();
+  if(error){ document.getElementById('cfgMsg').textContent='Sin permisos de admin: '+error.message; return; }
+  cfg=data;
+  document.getElementById('cfgMinVersion').value=data.min_version||'';
+  document.getElementById('cfgLatestVersion').value=data.latest_version||'';
+  document.getElementById('cfgMessage').value=data.message||'';
+  document.getElementById('cfgForceUpdate').checked=!!data.force_update;
+  document.getElementById('cfgMaintenance').checked=!!data.maintenance_mode;
+  document.getElementById('cfgApkCurrent').innerHTML = data.update_url
+    ? `APK actual: <a href="${esc(data.update_url)}" target="_blank" rel="noopener">${esc(data.update_url.split('/').pop())}</a>` : 'Todavía no has configurado ningún APK.';
+}
+async function saveConfig(){
+  const msg=document.getElementById('cfgMsg');
+  const file=document.getElementById('cfgApkFile').files[0];
+  const manualUrl=document.getElementById('cfgApkUrl').value.trim();
+  let updateUrl=null;
+  if(!file && manualUrl) updateUrl=manualUrl;
+  if(file){
+    msg.textContent='Subiendo APK…';
+    const path=`latest-${Date.now()}.apk`;
+    const { error:upErr } = await sb.storage.from('updates').upload(path,file,{ upsert:true, contentType:'application/vnd.android.package-archive' });
+    if(upErr){
+      const big=/exceeded|maximum|size/i.test(upErr.message);
+      msg.textContent='Error subiendo APK: '+upErr.message+(big?' — Pesa más del límite de Supabase (50 MB en plan gratuito). Súbelo a GitHub Releases y pega el enlace en el campo de URL. NO se guardó nada.':' — NO se guardó nada.');
+      return;
+    }
+    updateUrl=sb.storage.from('updates').getPublicUrl(path).data.publicUrl;
+  }
+  const payload={ id:1,
+    min_version:document.getElementById('cfgMinVersion').value.trim(),
+    latest_version:document.getElementById('cfgLatestVersion').value.trim(),
+    message:document.getElementById('cfgMessage').value.trim()||null,
+    force_update:document.getElementById('cfgForceUpdate').checked,
+    maintenance_mode:document.getElementById('cfgMaintenance').checked,
+    updated_at:new Date().toISOString() };
+  if(updateUrl) payload.update_url=updateUrl;
+  const { error } = await sb.from('app_config').upsert(payload);
+  msg.textContent = error ? 'Error: '+error.message : 'Guardado ✔';
+  if(!error){ document.getElementById('cfgApkFile').value=''; document.getElementById('cfgApkUrl').value=''; await loadConfig(); renderTable(); }
+}
+
+checkSession();
+</script>
+</body>
+</html>
