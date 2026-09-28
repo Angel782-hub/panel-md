@@ -193,15 +193,30 @@ function normalizeCode(raw){
 }
 
 /* ---------- sesión ---------- */
+/* Solo entra quien está en la tabla "admins"; cualquier otra cuenta se expulsa. */
+async function isAdmin(){
+  const { data, error } = await sb.rpc('is_admin');
+  return !error && data === true;
+}
+async function denyAndSignOut(msg){
+  await sb.auth.signOut();
+  document.getElementById('app').style.display='none';
+  document.getElementById('login').style.display='block';
+  const m=document.getElementById('loginMsg'); if(m) m.textContent=msg;
+}
 async function checkSession(){
   const { data:{ session } } = await sb.auth.getSession();
-  if(session){ showApp(); loadAll(); }
+  if(!session) return;
+  if(!(await isAdmin())){ await denyAndSignOut('Esta cuenta no tiene acceso al panel de administración.'); return; }
+  showApp(); loadAll();
 }
 async function login(){
   const msg=document.getElementById('loginMsg'); msg.textContent='Entrando…';
   const { error } = await sb.auth.signInWithPassword({
     email:document.getElementById('email').value.trim(), password:document.getElementById('password').value });
   if(error){ msg.textContent='Error: '+error.message; return; }
+  if(!(await isAdmin())){ await denyAndSignOut('Esta cuenta no tiene acceso al panel de administración.'); return; }
+  msg.textContent='';
   showApp(); loadAll();
 }
 async function logout(){
