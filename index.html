@@ -52,8 +52,8 @@
   <h2 style="margin-top:0">Panel de Licencias</h2>
   <p class="muted">Inicia sesión con tu cuenta de administrador.</p>
   <div style="display:flex;flex-direction:column;gap:10px">
-  <input id="email" type="email" placeholder="correo de administrador" autocomplete="username" />
-  <input id="password" type="password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
+    <input id="email" type="email" value="angeljs6819@gmail.com" />
+    <input id="password" type="password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
     <button class="btn-primary" onclick="login()">Entrar</button>
     <div id="loginMsg" class="muted"></div>
   </div>
@@ -67,10 +67,22 @@
   </header>
 
   <main>
-    <!-- Activar dispositivo -->
+    <!-- Cuentas pendientes de activación -->
+    <div class="card" id="pendingCard" style="display:none;border-color:var(--warn)">
+      <h3 style="margin-top:0">⏳ Cuentas pendientes de activación (<span id="pendingCount">0</span>)</h3>
+      <p class="muted" style="margin-top:0">Usuarios que se registraron en la app con correo y contraseña. Tú decides el plan y los días de cada uno; sin tu aprobación no puede usar la app. Al pulsar «Activar» su app entra sola en unos segundos.</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Correo</th><th>Plan</th><th>Días</th><th>Acciones</th></tr></thead>
+          <tbody id="pbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Activar dispositivo (licencias antiguas por código) -->
     <div class="card">
-      <h3 style="margin-top:0">Activar dispositivo</h3>
-      <p class="muted" style="margin-top:0">Pega el código que te mandó el usuario desde su app (formato XXXXX-XXXXX-XXXXX-XXXXX-XXXXX).</p>
+      <h3 style="margin-top:0">Activar dispositivo por código <span class="muted">(método anterior)</span></h3>
+      <p class="muted" style="margin-top:0">Solo para licencias antiguas: pega el código de dispositivo (formato XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Los usuarios nuevos se registran con correo y aparecen arriba como pendientes.</p>
       <div class="grid2">
         <div><label class="muted">Código del dispositivo</label>
           <input id="actCode" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" style="font-family:monospace;letter-spacing:1px" /></div>
@@ -108,12 +120,12 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <h3 style="margin:0">Dispositivos y licencias</h3>
-        <input id="searchBox" type="text" placeholder="Buscar por nombre o código…" style="width:280px" oninput="renderTable()" />
+        <input id="searchBox" type="text" placeholder="Buscar por correo, nombre o código…" style="width:280px" oninput="renderTable()" />
       </div>
       <div style="overflow-x:auto;margin-top:12px">
         <table>
           <thead><tr>
-            <th>Conexión</th><th>Nombre</th><th>Plan</th><th>Vence</th><th>Código</th>
+            <th>Conexión</th><th>Correo</th><th>Nombre</th><th>Plan</th><th>Vence</th><th>Código</th>
             <th>Ubicación</th><th>App</th><th>Licencia</th><th>Acciones</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
@@ -207,7 +219,7 @@ async function loadAll(){
 }
 function isEditing(){
   const a=document.activeElement;
-  return a && a.closest && a.closest('#tbody') && ['INPUT','SELECT'].includes(a.tagName);
+  return a && a.closest && (a.closest('#tbody') || a.closest('#pbody')) && ['INPUT','SELECT'].includes(a.tagName);
 }
 
 /* ---------- mapa ---------- */
@@ -243,26 +255,49 @@ function fitMap(force){
 /* ---------- licencias ---------- */
 async function loadLicenses(){
   const { data, error } = await sb.from('user_licenses')
-    .select('id, device_label, tier, expires_at, hardware_id, is_active, notes, last_seen_at, app_version, in_foreground, last_lat, last_lng, last_accuracy, location_at, location_requested, location_requested_at')
+    .select('id, device_label, tier, expires_at, hardware_id, is_active, notes, last_seen_at, app_version, in_foreground, last_lat, last_lng, last_accuracy, location_at, location_requested, location_requested_at, email, pending, registered_at')
     .order('last_seen_at',{ascending:false,nullsFirst:false});
   if(error){ document.getElementById('listMsg').textContent='Error: '+error.message; return; }
   licenses = data; renderTable(); renderMap();
 }
 function renderStats(){
-  const c={use:0,bg:0,off:0}; let blocked=0;
-  licenses.forEach(l=>{ c[presence(l)]++; if(!l.is_active) blocked++; });
+  const c={use:0,bg:0,off:0}; let blocked=0, pend=0;
+  licenses.forEach(l=>{ if(l.pending){ pend++; return; } c[presence(l)]++; if(!l.is_active) blocked++; });
+  document.title = (pend ? `(${pend}) ` : '') + 'Panel de Licencias · MetricDrivers';
   document.getElementById('stats').innerHTML =
-    `<div class="stat"><b>${licenses.length}</b>total</div>
+    `${pend?`<div class="stat"><b style="color:${COLORS.bg}">${pend}</b>pendientes</div>`:''}
+     <div class="stat"><b>${licenses.length-pend}</b>total</div>
      <div class="stat"><b style="color:${COLORS.use}">${c.use}</b>en uso</div>
      <div class="stat"><b style="color:${COLORS.bg}">${c.bg}</b>2º plano</div>
      <div class="stat"><b style="color:#9aa1ab">${c.off}</b>desconectados</div>
      <div class="stat"><b style="color:${COLORS.blocked}">${blocked}</b>bloqueados</div>`;
 }
+const draft = {};   // id -> {tier, days}: lo que el admin va eligiendo para cada cuenta pendiente
+function renderPending(term){
+  const list = licenses.filter(l=>l.pending && (!term || (l.email||'').toLowerCase().includes(term)));
+  document.getElementById('pendingCard').style.display = list.length ? 'block' : 'none';
+  document.getElementById('pendingCount').textContent = list.length;
+  const pb = document.getElementById('pbody'); pb.innerHTML='';
+  list.forEach(l=>{
+    const d = draft[l.id] || (draft[l.id] = { tier:'pro', days:'' });
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${esc(l.email||'(sin correo)')}</b><div class="muted">se registró ${ago(l.registered_at)}</div></td>
+      <td><select onchange="draft['${l.id}'].tier=this.value">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${d.tier===t?'selected':''}>${t}</option>`).join('')}</select></td>
+      <td><input type="number" min="1" value="${d.days}" placeholder="días" style="width:90px" oninput="draft['${l.id}'].days=this.value" /></td>
+      <td class="row-actions">
+        <button class="btn-primary" onclick="approveAccount('${l.id}')">Activar</button>
+        <button class="btn-ghost" onclick="rejectAccount('${l.id}')">Rechazar</button>
+      </td>`;
+    pb.appendChild(tr);
+  });
+}
 function renderTable(){
   renderStats();
   const term=document.getElementById('searchBox').value.toLowerCase();
+  renderPending(term);
   const tbody=document.getElementById('tbody'); tbody.innerHTML='';
-  licenses.filter(l=>!term||(l.device_label||'').toLowerCase().includes(term)||(l.hardware_id||'').toLowerCase().includes(term))
+  licenses.filter(l=>!l.pending && (!term||(l.device_label||'').toLowerCase().includes(term)||(l.email||'').toLowerCase().includes(term)||(l.hardware_id||'').toLowerCase().includes(term)))
   .forEach(l=>{
     const p=presence(l), expired=l.expires_at&&new Date(l.expires_at)<new Date();
     const outdated = cfg && l.app_version && verLt(l.app_version, cfg.min_version);
@@ -277,10 +312,11 @@ function renderTable(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><span class="dot" style="background:${COLORS[p]}"></span>${presenceText[p]}<div class="muted">${ago(l.last_seen_at)}</div></td>
+      <td>${l.email?`<b>${esc(l.email)}</b>`:'<span class="muted">—</span>'}</td>
       <td><input type="text" value="${esc(l.device_label)}" placeholder="Sin nombre" onchange="updateLabel('${l.id}', this.value)" /></td>
       <td><select onchange="updateTier('${l.id}', this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${l.tier===t?'selected':''}>${t}</option>`).join('')}</select></td>
       <td><input type="date" value="${l.expires_at?l.expires_at.substring(0,10):''}" onchange="updateExpiry('${l.id}', this.value)" /></td>
-      <td><code>${esc(l.hardware_id)}</code></td>
+      <td>${l.hardware_id?`<code>${esc(l.hardware_id)}</code>`:'<span class="muted">Sin teléfono</span>'}</td>
       <td>${loc}</td>
       <td>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠</span>':''}</td>
       <td><span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
@@ -288,6 +324,7 @@ function renderTable(){
       <td class="row-actions">
         <button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>
         <button class="btn-${l.is_active?'danger':'primary'}" onclick="toggleActive('${l.id}', ${!l.is_active})">${l.is_active?'Bloquear':'Activar'}</button>
+        ${l.email&&l.hardware_id?`<button class="btn-ghost" title="Desvincula el teléfono (cambio de celular)" onclick="releaseDevice('${l.id}')">Liberar cel</button>`:''}
         <button class="btn-ghost" onclick="deleteLicense('${l.id}')">Eliminar</button>
       </td>`;
     tbody.appendChild(tr);
@@ -302,9 +339,27 @@ async function toggleActive(id, newValue){
   if(newValue===false){
     const reason=prompt('Motivo del bloqueo (se mostrará al usuario, opcional):','');
     if(reason===null) return;
-    return upd(id,{ is_active:false, notes:reason.trim()||null });
+    return upd(id,{ is_active:false, pending:false, notes:reason.trim()||null });
   }
   return upd(id,{ is_active:true, notes:null });
+}
+async function approveAccount(id){
+  const d = draft[id] || { tier:'pro', days:'' };
+  const days = parseInt(d.days,10);
+  if(!days || days < 1){ alert('Escribe cuántos días de licencia le das a este usuario.'); return; }
+  await upd(id,{ is_active:true, pending:false, tier:d.tier,
+                 expires_at:new Date(Date.now()+days*86400000).toISOString(), notes:null });
+  delete draft[id];
+}
+async function rejectAccount(id){
+  const reason = prompt('Motivo del rechazo (se mostrará al usuario, opcional):','');
+  if(reason===null) return;
+  await upd(id,{ is_active:false, pending:false, notes:reason.trim()||null });
+  delete draft[id];
+}
+async function releaseDevice(id){
+  if(!confirm('¿Liberar el teléfono de esta cuenta? Se vinculará al próximo teléfono donde inicie sesión.')) return;
+  await upd(id,{ hardware_id:null });
 }
 const requestLocation = id => upd(id,{ location_requested:true, location_requested_at:new Date().toISOString() });
 const updateTier  = (id,v)=>upd(id,{ tier:v });
