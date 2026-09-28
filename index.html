@@ -52,8 +52,8 @@
   <h2 style="margin-top:0">Panel de Licencias</h2>
   <p class="muted">Inicia sesión con tu cuenta de administrador.</p>
   <div style="display:flex;flex-direction:column;gap:10px">
-    <input id="email" type="email" value="angeljs6819@gmail.com" />
-    <input id="password" type="password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
+  <input id="email" type="email" placeholder="correo de administrador" autocomplete="username" />
+  <input id="password" type="password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
     <button class="btn-primary" onclick="login()">Entrar</button>
     <div id="loginMsg" class="muted"></div>
   </div>
