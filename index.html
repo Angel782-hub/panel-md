@@ -5,157 +5,272 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="referrer" content="strict-origin-when-cross-origin" />
 <title>Panel de Licencias · MetricDrivers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <style>
-  :root{--bg:#0f1115;--panel:#171a21;--border:#262a33;--text:#e8eaed;--muted:#9aa1ab;
-        --accent:#3ecf8e;--danger:#ef4444;--warn:#f59e0b;--gray:#6b7280}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-  header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-  header h1{font-size:16px;margin:0}
-  main{max-width:1250px;margin:0 auto;padding:24px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px}
+  :root{
+    --bg:#0b1020;--side:#0e1428;--panel:#131b30;--panel2:#1a2440;--border:#243050;--field:#0d1426;
+    --text:#e8ecf7;--muted:#8f9bb5;--accent:#7b9bff;--accent-ink:#0b1533;
+    --ok:#34d399;--danger:#f87171;--warn:#fbbf24;
+    --ok-bg:rgba(52,211,153,.12);--danger-bg:rgba(248,113,113,.12);--warn-bg:rgba(251,191,36,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 14px 30px -14px rgba(0,0,0,.55)}
+  @media(prefers-color-scheme:light){:root{
+    --bg:#f2f4fa;--side:#fff;--panel:#fff;--panel2:#f5f7fc;--border:#e1e6f0;--field:#fff;
+    --text:#131a2b;--muted:#64708a;--accent:#3559e0;--accent-ink:#fff;
+    --ok:#059669;--danger:#dc2626;--warn:#b45309;
+    --ok-bg:rgba(5,150,105,.1);--danger-bg:rgba(220,38,38,.09);--warn-bg:rgba(217,119,6,.12);
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 14px 30px -18px rgba(16,24,40,.2)}}
+  *{box-sizing:border-box}html{color-scheme:light dark}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Manrope,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  aside{position:sticky;top:0;height:100vh;background:var(--side);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+  .brand{display:flex;align-items:center;gap:12px;padding:0 8px}
+  .logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800}
+  .brand b{display:block;font-size:15px;letter-spacing:-.01em}.brand small{color:var(--muted);font-size:12px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav button{display:flex;align-items:center;gap:12px;background:none;color:var(--muted);text-align:left;padding:10px 12px;border-radius:10px;border:none;font-weight:600;position:relative}
+  .nav button svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .nav button:hover{background:var(--panel2);color:var(--text)}
+  .nav button.active{background:var(--panel2);color:var(--text)}
+  .nav button.active::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+  .badge{margin-left:auto;background:var(--warn);color:#2a1900;border-radius:999px;font-size:11px;font-weight:800;padding:1px 8px;display:none}
+  .side-foot{margin-top:auto}
+  .content{min-width:0}
+  .topbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 32px;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+  .topbar h2{margin:0;font-size:20px;letter-spacing:-.02em}
+  .live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px}
+  .live i{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  main{max-width:1280px;padding:28px 32px}
+  .view{display:none}.view.active{display:block}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:20px;box-shadow:var(--shadow)}
+  .card h3{font-size:15px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow)}
+  .kpi span{color:var(--muted);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+  .kpi b{display:block;font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin-top:6px}
+  .kpi .dot{margin:0}
+  #distBar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--panel2);margin:14px 0 10px}
+  #distBar i{display:block;transition:width .4s}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+  .li:last-child{border-bottom:none}
+  .empty{color:var(--muted);padding:18px 0;text-align:center;font-size:13px}
   input,button,select{font:inherit}
-  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],select{
-    background:#0f1115;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%}
-  table input[type=text]{min-width:120px}
-  button{cursor:pointer;border:none;border-radius:6px;padding:8px 14px;font-weight:600}
-  .btn-primary{background:var(--accent);color:#00291b}
-  .btn-danger{background:var(--danger);color:#fff}
-  .btn-warn{background:var(--warn);color:#2a1900}
-  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=file],select{
+    background:var(--field);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;width:100%;transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+  input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+  input[type=file]{padding:7px 10px;font-size:13px}
+  label.muted{display:block;margin-bottom:6px;font-weight:600}
+  table input[type=text]{min-width:130px}
+  button{cursor:pointer;border:1px solid transparent;border-radius:10px;padding:9px 16px;font-weight:600;transition:filter .15s,background .15s}
+  button:hover:not(:disabled){filter:brightness(1.1)}button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn-primary{background:var(--accent);color:var(--accent-ink)}
+  .btn-danger{background:var(--danger-bg);color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)}
+  .btn-ghost{background:transparent;border-color:var(--border);color:var(--text)}
+  .btn-ghost:hover:not(:disabled){background:var(--panel2)}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}.row-actions button{padding:6px 11px;font-size:12px}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
-  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;white-space:nowrap}
-  code{font-size:12px;word-break:break-all}
-  .pill{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
-  .pill-ok{background:#12331f;color:#3ecf8e}.pill-off{background:#331212;color:#ef4444}
-  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
-  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
-  .login-box{max-width:360px;margin:80px auto}
-  .muted{color:var(--muted);font-size:13px}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  thead th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:var(--panel2)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
+  .pill{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;display:inline-block}
+  .pill-ok{background:var(--ok-bg);color:var(--ok)}.pill-off{background:var(--danger-bg);color:var(--danger)}.pill-warn{background:var(--warn-bg);color:var(--warn)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
+  .muted{color:var(--muted);font-size:12.5px}
+  a{color:var(--accent);text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
   #app{display:none}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .stats{display:flex;gap:10px;flex-wrap:wrap}
-  .stat{background:#0f1115;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px}
-  .stat b{font-size:16px;margin-right:4px}
-  #map{height:380px;border-radius:8px;border:1px solid var(--border)}
-  a{color:var(--accent)}
-  @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.legend .dot{margin-right:5px}
+  #map{height:calc(100vh - 250px);min-height:420px;border-radius:12px;border:1px solid var(--border);z-index:0}
+  @media(prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.85) saturate(.6)}}
+  .leaflet-popup-content-wrapper{border-radius:12px;font-family:inherit}
+  .login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .login-box{width:100%;max-width:380px;padding:32px}
+  .login-box .logo{width:44px;height:44px;margin-bottom:18px;border-radius:12px;font-size:19px}
+  .login-box h2{margin:0 0 6px;font-size:22px;letter-spacing:-.02em}
+  @media(max-width:900px){
+    .shell{grid-template-columns:1fr}
+    aside{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;z-index:1100;flex-direction:row;padding:6px;border-right:none;border-top:1px solid var(--border);gap:0}
+    .brand,.side-foot{display:none}.nav{flex-direction:row;width:100%;justify-content:space-around}
+    .nav button{flex-direction:column;gap:2px;padding:6px 8px;font-size:11px}.nav button.active::before{display:none}
+    .badge{position:absolute;top:0;right:2px;margin:0}
+    main{padding:16px 16px 90px}.topbar{padding:12px 16px}.grid2,.two{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  .toolbar{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .toolbar input{flex:1;min-width:240px}.toolbar select{width:200px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .chip{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:6px 14px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .chip b{background:var(--panel2);color:var(--text);border-radius:999px;padding:0 8px;font-size:12px}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .chip.on b{background:rgba(0,0,0,.18);color:inherit}
+  .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;align-items:start}
+  .dev{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+  .dev-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dev-id{flex:1;min-width:0}
+  .dev-id .name{font-weight:700;font-size:15px;background:transparent;border-color:transparent;padding:4px 8px;margin:0 0 2px -8px;width:calc(100% + 8px)}
+  .dev-id .name:hover{border-color:var(--border)}.dev-id .name:focus{background:var(--field)}
+  .dev-id .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dev-st{display:flex;align-items:center;font-size:13px;font-weight:600;margin-top:-6px}
+  .dev-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:13px}
+  .dev-fields label{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-bottom:4px}
+  .dev-fields select,.dev-fields input{padding:7px 10px}
+  @media(max-width:900px){.devgrid{grid-template-columns:1fr}}
+
+  .kpi.link{cursor:pointer;transition:border-color .15s,transform .15s,background .15s}
+  .kpi.link:hover{border-color:var(--accent);background:var(--panel2);transform:translateY(-2px)}
+  .kpi.link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .kpi.link::after{content:"Ver";position:absolute;top:16px;right:18px;font-size:12px;font-weight:700;color:var(--accent);opacity:0;transition:opacity .15s}
+  .kpi.link:hover::after,.kpi.link:focus-visible::after{opacity:1}
+  .kpi{position:relative}
+
+  .avatar{width:38px;height:38px;border-radius:50%;background:var(--warn-bg);color:var(--warn);display:grid;place-items:center;font-weight:800;flex:none}
+  .seg{display:flex;background:var(--field);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+  .seg button{flex:1;background:transparent;color:var(--muted);border:none;border-radius:8px;padding:6px 4px;font-size:12.5px}
+  .seg button.on{background:var(--accent);color:var(--accent-ink)}
+  .seg button:not(.on):hover{color:var(--text);background:var(--panel2)}
+  .sum{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel2);border-radius:8px;padding:8px 10px}
 </style>
 </head>
 <body>
 
-<div id="login" class="login-box card">
-  <h2 style="margin-top:0">Panel de Licencias</h2>
-  <p class="muted">Inicia sesión con tu cuenta de administrador.</p>
-  <div style="display:flex;flex-direction:column;gap:10px">
-    <input id="email" type="email" placeholder="correo de administrador" autocomplete="username" />
-    <input id="password" type="password" autocomplete="current-password" placeholder="contraseña" onkeydown="if(event.key==='Enter')login()" />
-    <button class="btn-primary" onclick="login()">Entrar</button>
-    <div id="loginMsg" class="muted"></div>
+<div id="login" class="login-wrap">
+  <div class="login-box card">
+    <div class="logo">M</div>
+    <h2>Panel de licencias</h2>
+    <p class="muted" style="margin:0 0 20px">Inicia sesión con tu cuenta de administrador.</p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <input id="email" type="email" placeholder="Correo de administrador" autocomplete="username" />
+      <input id="password" type="password" autocomplete="current-password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')login()" />
+      <button class="btn-primary" style="padding:11px" onclick="login()">Entrar</button>
+      <div id="loginMsg" class="muted"></div>
+    </div>
   </div>
 </div>
 
 <div id="app">
-  <header>
-    <h1>🔐 Panel de Licencias — MetricDrivers</h1>
-    <div class="stats" id="stats"></div>
-    <button class="btn-ghost" onclick="logout()">Cerrar sesión</button>
-  </header>
+<div class="shell">
+  <aside>
+    <div class="brand"><div class="logo">M</div><div><b>MetricDrivers</b><small>Licencias</small></div></div>
+    <nav class="nav">
+      <button data-v="resumen" onclick="nav('resumen')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Resumen</span></button>
+      <button data-v="dispositivos" onclick="nav('dispositivos')"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg><span>Dispositivos</span></button>
+      <button data-v="pendientes" onclick="nav('pendientes')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Pendientes</span><em class="badge" id="navPend" style="font-style:normal">0</em></button>
+      <button data-v="mapa" onclick="nav('mapa')"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Mapa</span></button>
+      <button data-v="ajustes" onclick="nav('ajustes')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Ajustes</span></button>
+    </nav>
+    <div class="side-foot"><button class="btn-ghost" style="width:100%" onclick="logout()">Cerrar sesión</button></div>
+  </aside>
 
-  <main>
-    <!-- Cuentas pendientes de activación -->
-    <div class="card" id="pendingCard" style="display:none;border-color:var(--warn)">
-      <h3 style="margin-top:0">⏳ Cuentas pendientes de activación (<span id="pendingCount">0</span>)</h3>
-      <p class="muted" style="margin-top:0">Usuarios que se registraron en la app con correo y contraseña. Tú decides el plan y los días de cada uno; sin tu aprobación no puede usar la app. Al pulsar «Activar» su app entra sola en unos segundos.</p>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Correo</th><th>Plan</th><th>Días</th><th>Acciones</th></tr></thead>
-          <tbody id="pbody"></tbody>
-        </table>
-      </div>
-    </div>
+  <div class="content">
+    <div class="topbar"><h2 id="viewTitle">Resumen</h2><div class="live"><i></i>En vivo · cada 5 s</div></div>
+    <main>
 
-    <!-- Activar dispositivo (licencias antiguas por código) -->
-    <div class="card">
-      <h3 style="margin-top:0">Activar dispositivo por código <span class="muted">(método anterior)</span></h3>
-      <p class="muted" style="margin-top:0">Solo para licencias antiguas: pega el código de dispositivo (formato XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Los usuarios nuevos se registran con correo y aparecen arriba como pendientes.</p>
-      <div class="grid2">
-        <div><label class="muted">Código del dispositivo</label>
-          <input id="actCode" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" style="font-family:monospace;letter-spacing:1px" /></div>
-        <div><label class="muted">Nombre / referencia (opcional)</label>
-          <input id="actLabel" type="text" placeholder="Ej. Juan Pérez" /></div>
-        <div><label class="muted">Plan</label>
-          <select id="actTier"><option value="free">free</option><option value="pro" selected>pro</option><option value="pro_plus">pro_plus</option></select></div>
-        <div><label class="muted">Duración (días)</label>
-          <input id="actDays" type="number" value="30" min="1" /></div>
-      </div>
-      <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <button class="btn-primary" onclick="activateDevice()">Activar dispositivo</button>
-        <span id="actMsg" class="muted"></span>
-      </div>
-    </div>
-
-    <!-- Mapa -->
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <h3 style="margin:0">Ubicación de dispositivos</h3>
-        <div class="muted">
-          <span class="dot" style="background:#3ecf8e"></span>En uso
-          <span class="dot" style="background:#f59e0b;margin-left:10px"></span>Segundo plano
-          <span class="dot" style="background:#6b7280;margin-left:10px"></span>Desconectado
-          <span class="dot" style="background:#ef4444;margin-left:10px"></span>Bloqueado
-          <button class="btn-ghost" style="margin-left:12px;padding:4px 10px" onclick="fitMap(true)">Centrar</button>
+      <section class="view" id="v-resumen">
+        <div class="kpis">
+          <div class="kpi link" role="button" tabindex="0" onclick="goFilter('all')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goFilter('all')}"><span>Dispositivos</span><b id="kTotal">0</b></div>
+          <div class="kpi link" role="button" tabindex="0" onclick="goFilter('use')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goFilter('use')}"><span><i class="dot" style="background:#3ecf8e"></i>En uso</span><b id="kUse">0</b></div>
+          <div class="kpi link" role="button" tabindex="0" onclick="goFilter('bg')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goFilter('bg')}"><span><i class="dot" style="background:#f59e0b"></i>Segundo plano</span><b id="kBg">0</b></div>
+          <div class="kpi link" role="button" tabindex="0" onclick="goFilter('off')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goFilter('off')}"><span><i class="dot" style="background:#6b7280"></i>Desconectados</span><b id="kOff">0</b></div>
+          <div class="kpi link" role="button" tabindex="0" onclick="goFilter('blocked')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goFilter('blocked')}"><span><i class="dot" style="background:#ef4444"></i>Bloqueados</span><b id="kBlocked">0</b></div>
+          <div class="kpi link" role="button" tabindex="0" onclick="nav('pendientes')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();nav('pendientes')}"><span>Pendientes</span><b id="kPend">0</b></div>
         </div>
-      </div>
-      <div id="map"></div>
-      <div class="muted" id="mapMsg" style="margin-top:6px"></div>
-      <div class="muted">La ubicación solo se actualiza cuando pulsas «📍 Ubicación» en la tabla de dispositivos. La solicitud caduca a los 10 minutos.</div>
-    </div>
+        <div class="card"><h3>Estado de la flota</h3><div id="distBar"></div>
+          <div class="muted legend"><span><i class="dot" style="background:#3ecf8e"></i>En uso</span><span><i class="dot" style="background:#f59e0b"></i>Segundo plano</span><span><i class="dot" style="background:#6b7280"></i>Desconectado</span><span><i class="dot" style="background:#ef4444"></i>Bloqueado</span></div></div>
+        <div class="two">
+          <div class="card"><h3>Por vencer</h3><p class="muted" style="margin:0 0 6px">Licencias que expiran en 7 días o ya expiraron.</p><div id="expList"></div></div>
+          <div class="card"><h3>App desactualizada</h3><p class="muted" style="margin:0 0 6px">Dispositivos por debajo de la versión mínima.</p><div id="oldList"></div></div>
+        </div>
+      </section>
 
-    <!-- Licencias -->
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-        <h3 style="margin:0">Dispositivos y licencias</h3>
-        <input id="searchBox" type="text" placeholder="Buscar por correo, nombre o código…" style="width:280px" oninput="renderTable()" />
-      </div>
-      <div style="overflow-x:auto;margin-top:12px">
-        <table>
-          <thead><tr>
-            <th>Conexión</th><th>Correo</th><th>Nombre</th><th>Plan</th><th>Vence</th><th>Código</th>
-            <th>Ubicación</th><th>App</th><th>Licencia</th><th>Acciones</th>
-          </tr></thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
-      <div id="listMsg" class="muted" style="margin-top:10px"></div>
-    </div>
+      <section class="view" id="v-dispositivos">
+        <div class="toolbar">
+          <input id="searchBox" type="text" placeholder="Buscar por correo, nombre o código…" oninput="renderTable()" />
+          <select id="sortBox" onchange="renderTable()">
+            <option value="recent">Última conexión</option>
+            <option value="name">Nombre (A-Z)</option>
+            <option value="expiry">Vence primero</option>
+          </select>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div id="devGrid" class="devgrid"></div>
+        <div id="listMsg" class="muted" style="margin-top:10px"></div>
+      </section>
 
-    <!-- Configuración -->
-    <div class="card">
-      <h3 style="margin-top:0">Configuración de la app</h3>
-      <div class="grid2">
-        <div><label class="muted">Versión mínima requerida</label><input id="cfgMinVersion" type="text" placeholder="1.2.0" /></div>
-        <div><label class="muted">Última versión disponible</label><input id="cfgLatestVersion" type="text" placeholder="1.2.0" /></div>
-        <div><label class="muted">Archivo APK (se sube a Supabase Storage, máx. 50 MB)</label>
-          <input id="cfgApkFile" type="file" accept=".apk" />
-          <div id="cfgApkCurrent" class="muted" style="margin-top:4px"></div></div>
-        <div><label class="muted">…o pega un enlace directo al APK (si pesa más de 50 MB)</label>
-          <input id="cfgApkUrl" type="text" placeholder="https://github.com/.../releases/download/v1.2.0/app.apk" /></div>
-        <div style="grid-column:1/-1"><label class="muted">Mensaje (opcional, se muestra al usuario)</label>
-          <input id="cfgMessage" type="text" placeholder="Corrige errores y agrega soporte para..." /></div>
-      </div>
-      <div style="margin-top:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-        <label><input id="cfgForceUpdate" type="checkbox" /> Forzar actualización (bloquea la app hasta actualizar)</label>
-        <label><input id="cfgMaintenance" type="checkbox" /> Modo mantenimiento (bloquea TODAS las apps)</label>
-        <button class="btn-primary" onclick="saveConfig()">Guardar configuración</button>
-        <span id="cfgMsg" class="muted"></span>
-      </div>
-    </div>
-  </main>
+      <section class="view" id="v-pendientes">
+        <p class="muted" style="margin:0 0 16px;max-width:760px">Usuarios que se registraron en la app con correo y contraseña. Tú decides el plan y los días de cada uno; sin tu aprobación no pueden usar la app. Al pulsar «Activar» su app entra sola en unos segundos.</p>
+        <div id="pgrid" class="devgrid"></div>
+        <div id="pendingEmpty" class="card empty" style="display:none;padding:56px 20px">
+          <div style="font-size:34px;margin-bottom:8px">✅</div>
+          <b style="font-size:16px;color:var(--text)">Todo al día</b>
+          <div>No hay cuentas esperando aprobación.</div>
+        </div>
+      </section>
+
+      <section class="view" id="v-mapa">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+            <h3>Ubicación de dispositivos</h3>
+            <div class="muted legend">
+              <span><i class="dot" style="background:#3ecf8e"></i>En uso</span><span><i class="dot" style="background:#f59e0b"></i>Segundo plano</span><span><i class="dot" style="background:#6b7280"></i>Desconectado</span><span><i class="dot" style="background:#ef4444"></i>Bloqueado</span>
+              <button class="btn-ghost" style="padding:5px 12px;font-size:12px" onclick="fitMap(true)">Centrar</button>
+            </div>
+          </div>
+          <div id="map"></div>
+          <div class="muted" id="mapMsg" style="margin-top:10px"></div>
+          <div class="muted">La ubicación solo se actualiza cuando pulsas «📍 Ubicación» en la tabla de dispositivos. La solicitud caduca a los 10 minutos.</div>
+        </div>
+      </section>
+
+      <section class="view" id="v-ajustes">
+        <div class="two" style="align-items:start">
+          <div class="card">
+            <h3>Configuración de la app</h3>
+            <p class="muted" style="margin:0 0 16px">Versiones, actualización y modo mantenimiento.</p>
+            <div class="grid2">
+              <div><label class="muted">Versión mínima requerida</label><input id="cfgMinVersion" type="text" placeholder="1.2.0" /></div>
+              <div><label class="muted">Última versión disponible</label><input id="cfgLatestVersion" type="text" placeholder="1.2.0" /></div>
+              <div style="grid-column:1/-1"><label class="muted">Archivo APK (se sube a Supabase Storage, máx. 50 MB)</label>
+                <input id="cfgApkFile" type="file" accept=".apk" /><div id="cfgApkCurrent" class="muted" style="margin-top:6px"></div></div>
+              <div style="grid-column:1/-1"><label class="muted">…o pega un enlace directo al APK (si pesa más de 50 MB)</label>
+                <input id="cfgApkUrl" type="text" placeholder="https://github.com/.../releases/download/v1.2.0/app.apk" /></div>
+              <div style="grid-column:1/-1"><label class="muted">Mensaje (opcional, se muestra al usuario)</label>
+                <input id="cfgMessage" type="text" placeholder="Corrige errores y agrega soporte para..." /></div>
+            </div>
+            <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+              <label><input id="cfgForceUpdate" type="checkbox" />Forzar actualización (bloquea la app hasta actualizar)</label>
+              <label><input id="cfgMaintenance" type="checkbox" />Modo mantenimiento (bloquea TODAS las apps)</label>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn-primary" onclick="saveConfig()">Guardar configuración</button><span id="cfgMsg" class="muted"></span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Activar dispositivo por código</h3>
+            <p class="muted" style="margin:0 0 16px">Método anterior, solo para licencias antiguas. Los usuarios nuevos aparecen en Pendientes.</p>
+            <div class="grid2">
+              <div style="grid-column:1/-1"><label class="muted">Código del dispositivo</label>
+                <input id="actCode" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" style="font-family:ui-monospace,Menlo,monospace;letter-spacing:1px" /></div>
+              <div style="grid-column:1/-1"><label class="muted">Nombre / referencia (opcional)</label><input id="actLabel" type="text" placeholder="Ej. Juan Pérez" /></div>
+              <div><label class="muted">Plan</label><select id="actTier"><option value="free">free</option><option value="pro" selected>pro</option><option value="pro_plus">pro_plus</option></select></div>
+              <div><label class="muted">Duración (días)</label><input id="actDays" type="number" value="30" min="1" /></div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn-primary" onclick="activateDevice()">Activar dispositivo</button><span id="actMsg" class="muted"></span></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
 </div>
 
 <script>
@@ -163,8 +278,8 @@ const SUPABASE_URL = "https://fjfefkixemfcixjuefqk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_MYOied1D7gjo9NMX0qqDoQ_jTJ303eE";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ONLINE_MS = 150000;       // visto en los últimos 2.5 min = conectado (heartbeat de la app: 60 s)
-const REFRESH_MS = 5000;        // el panel se actualiza solo cada 5 s
+const ONLINE_MS = 150000;
+const REFRESH_MS = 5000;
 const COLORS = { use:'#3ecf8e', bg:'#f59e0b', off:'#6b7280', blocked:'#ef4444' };
 
 let licenses = [], cfg = null, map = null, layer = null, fitted = false, timer = null;
@@ -193,7 +308,6 @@ function normalizeCode(raw){
 }
 
 /* ---------- sesión ---------- */
-/* Solo entra quien está en la tabla "admins"; cualquier otra cuenta se expulsa. */
 async function isAdmin(){
   const { data, error } = await sb.rpc('is_admin');
   return !error && data === true;
@@ -201,7 +315,7 @@ async function isAdmin(){
 async function denyAndSignOut(msg){
   await sb.auth.signOut();
   document.getElementById('app').style.display='none';
-  document.getElementById('login').style.display='block';
+  document.getElementById('login').style.display='grid';
   const m=document.getElementById('loginMsg'); if(m) m.textContent=msg;
 }
 async function checkSession(){
@@ -221,11 +335,19 @@ async function login(){
 }
 async function logout(){
   clearInterval(timer); await sb.auth.signOut();
-  document.getElementById('app').style.display='none'; document.getElementById('login').style.display='block';
+  document.getElementById('app').style.display='none'; document.getElementById('login').style.display='grid';
 }
 function showApp(){
   document.getElementById('login').style.display='none'; document.getElementById('app').style.display='block';
-  initMap();
+  initMap(); nav((location.hash||'#resumen').slice(1));
+}
+function nav(v){
+  if(!document.getElementById('v-'+v)) v='resumen';
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id==='v-'+v));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+  document.getElementById('viewTitle').textContent=document.querySelector(`.nav button[data-v="${v}"] span`).textContent;
+  history.replaceState(null,'','#'+v); window.scrollTo(0,0);
+  if(v==='mapa' && map){ setTimeout(()=>{ map.invalidateSize(); fitMap(false); },80); }
 }
 async function loadAll(){
   await loadConfig(); await loadLicenses();
@@ -234,7 +356,7 @@ async function loadAll(){
 }
 function isEditing(){
   const a=document.activeElement;
-  return a && a.closest && (a.closest('#tbody') || a.closest('#pbody')) && ['INPUT','SELECT'].includes(a.tagName);
+  return a && a.closest && (a.closest('#devGrid') || a.closest('#pgrid')) && ['INPUT','SELECT'].includes(a.tagName);
 }
 
 /* ---------- mapa ---------- */
@@ -277,72 +399,127 @@ async function loadLicenses(){
 }
 function renderStats(){
   const c={use:0,bg:0,off:0}; let blocked=0, pend=0;
-  licenses.forEach(l=>{ if(l.pending){ pend++; return; } c[presence(l)]++; if(!l.is_active) blocked++; });
+  licenses.forEach(l=>{ if(l.pending){ pend++; return; } if(!l.is_active){ blocked++; return; } c[presence(l)]++; });
   document.title = (pend ? `(${pend}) ` : '') + 'Panel de Licencias · MetricDrivers';
-  document.getElementById('stats').innerHTML =
-    `${pend?`<div class="stat"><b style="color:${COLORS.bg}">${pend}</b>pendientes</div>`:''}
-     <div class="stat"><b>${licenses.length-pend}</b>total</div>
-     <div class="stat"><b style="color:${COLORS.use}">${c.use}</b>en uso</div>
-     <div class="stat"><b style="color:${COLORS.bg}">${c.bg}</b>2º plano</div>
-     <div class="stat"><b style="color:#9aa1ab">${c.off}</b>desconectados</div>
-     <div class="stat"><b style="color:${COLORS.blocked}">${blocked}</b>bloqueados</div>`;
+  const total = licenses.length-pend, set=(id,v)=>document.getElementById(id).textContent=v;
+  set('kTotal',total); set('kUse',c.use); set('kBg',c.bg); set('kOff',c.off); set('kBlocked',blocked); set('kPend',pend);
+  const nb=document.getElementById('navPend'); nb.textContent=pend; nb.style.display=pend?'inline-block':'none';
+  const pct=n=>total?(n/total*100):0;
+  document.getElementById('distBar').innerHTML =
+    `<i style="width:${pct(c.use)}%;background:${COLORS.use}"></i><i style="width:${pct(c.bg)}%;background:${COLORS.bg}"></i><i style="width:${pct(c.off)}%;background:${COLORS.off}"></i><i style="width:${pct(blocked)}%;background:${COLORS.blocked}"></i>`;
+  const soon=licenses.filter(l=>!l.pending&&l.is_active&&l.expires_at&&(new Date(l.expires_at)-Date.now())<7*86400000)
+    .sort((a,b)=>new Date(a.expires_at)-new Date(b.expires_at));
+  document.getElementById('expList').innerHTML = soon.length ? soon.map(l=>{
+    const d=Math.ceil((new Date(l.expires_at)-Date.now())/86400000);
+    return `<div class="li"><div><b>${esc(l.email||l.device_label||'Sin nombre')}</b><div class="muted">${esc(l.tier)}</div></div>
+      <span class="pill ${d<=0?'pill-off':'pill-warn'}">${d<=0?'Expirada':`${d} d`}</span></div>`;}).join('')
+    : '<div class="empty">Ninguna licencia vence en los próximos 7 días.</div>';
+  const old=cfg?licenses.filter(l=>!l.pending&&l.app_version&&verLt(l.app_version,cfg.min_version)):[];
+  document.getElementById('oldList').innerHTML = old.length ? old.map(l=>
+    `<div class="li"><div><b>${esc(l.email||l.device_label||'Sin nombre')}</b><div class="muted">${ago(l.last_seen_at)}</div></div><span class="pill pill-warn">v${esc(l.app_version)}</span></div>`).join('')
+    : '<div class="empty">Todos los dispositivos cumplen la versión mínima.</div>';
 }
-const draft = {};   // id -> {tier, days}: lo que el admin va eligiendo para cada cuenta pendiente
+const draft = {};
+const termNow = () => document.getElementById('searchBox').value.toLowerCase();
+const sumText = d => { const n=parseInt(d.days,10);
+  return n>0 ? `Plan ${d.tier} · vence el ${new Date(Date.now()+n*86400000).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'})}` : 'Elige cuántos días de licencia darle'; };
+function setPlan(id,t){ draft[id].tier=t; renderPending(termNow()); }
+function setDays(id,n){ draft[id].days=String(n); renderPending(termNow()); }
+function typeDays(id,v){ draft[id].days=v; const e=document.getElementById('sum-'+id); if(e) e.textContent=sumText(draft[id]); }
 function renderPending(term){
   const list = licenses.filter(l=>l.pending && (!term || (l.email||'').toLowerCase().includes(term)));
-  document.getElementById('pendingCard').style.display = list.length ? 'block' : 'none';
-  document.getElementById('pendingCount').textContent = list.length;
-  const pb = document.getElementById('pbody'); pb.innerHTML='';
+  document.getElementById('pendingEmpty').style.display = list.length ? 'none' : 'block';
+  const pg = document.getElementById('pgrid'); pg.innerHTML='';
   list.forEach(l=>{
     const d = draft[l.id] || (draft[l.id] = { tier:'pro', days:'' });
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><b>${esc(l.email||'(sin correo)')}</b><div class="muted">se registró ${ago(l.registered_at)}</div></td>
-      <td><select onchange="draft['${l.id}'].tier=this.value">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${d.tier===t?'selected':''}>${t}</option>`).join('')}</select></td>
-      <td><input type="number" min="1" value="${d.days}" placeholder="días" style="width:90px" oninput="draft['${l.id}'].days=this.value" /></td>
-      <td class="row-actions">
-        <button class="btn-primary" onclick="approveAccount('${l.id}')">Activar</button>
+    const el = document.createElement('div');
+    el.className='dev'; el.style.setProperty('--c','#f59e0b');
+    el.innerHTML = `
+      <div class="dev-h">
+        <div class="avatar">${esc((l.email||'?')[0].toUpperCase())}</div>
+        <div class="dev-id"><b style="font-size:15px">${esc(l.email||'(sin correo)')}</b>
+          <div class="muted">Se registró ${ago(l.registered_at)}</div></div>
+        <span class="pill pill-warn">Pendiente</span>
+      </div>
+      <div class="dev-fields" style="grid-template-columns:1fr">
+        <div><label>Plan</label><div class="seg">${['free','pro','pro_plus'].map(t=>`<button class="${d.tier===t?'on':''}" onclick="setPlan('${l.id}','${t}')">${t}</button>`).join('')}</div></div>
+        <div><label>Duración</label>
+          <div class="seg">${[7,15,30,90,365].map(n=>`<button class="${String(n)===String(d.days)?'on':''}" onclick="setDays('${l.id}',${n})">${n} d</button>`).join('')}</div>
+          <input type="number" min="1" value="${d.days}" placeholder="…o escribe los días" style="margin-top:8px" oninput="typeDays('${l.id}',this.value)" /></div>
+        <div class="sum" id="sum-${l.id}">${sumText(d)}</div>
+      </div>
+      <div class="row-actions">
+        <button class="btn-primary" style="flex:1;padding:9px" onclick="approveAccount('${l.id}')">Activar</button>
         <button class="btn-ghost" onclick="rejectAccount('${l.id}')">Rechazar</button>
-      </td>`;
-    pb.appendChild(tr);
+      </div>`;
+    pg.appendChild(el);
   });
+}
+let devFilter='all';
+function goFilter(f){ devFilter=f; nav('dispositivos'); renderTable(); }
+function setFilter(f){ devFilter=f; renderTable(); }
+function devInfo(l){
+  const expired=l.expires_at&&new Date(l.expires_at)<new Date();
+  const soon=l.is_active&&l.expires_at&&(new Date(l.expires_at)-Date.now())<7*86400000;
+  const st=!l.is_active?'blocked':presence(l);
+  return { st, expired, soon };
 }
 function renderTable(){
   renderStats();
   const term=document.getElementById('searchBox').value.toLowerCase();
   renderPending(term);
-  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
-  licenses.filter(l=>!l.pending && (!term||(l.device_label||'').toLowerCase().includes(term)||(l.email||'').toLowerCase().includes(term)||(l.hardware_id||'').toLowerCase().includes(term)))
-  .forEach(l=>{
-    const p=presence(l), expired=l.expires_at&&new Date(l.expires_at)<new Date();
+  const all=licenses.filter(l=>!l.pending);
+  const match=l=>!term||(l.device_label||'').toLowerCase().includes(term)||(l.email||'').toLowerCase().includes(term)||(l.hardware_id||'').toLowerCase().includes(term);
+  const tests={ all:()=>true, use:i=>i.st==='use', bg:i=>i.st==='bg', off:i=>i.st==='off', blocked:i=>i.st==='blocked', soon:i=>i.soon||i.expired };
+  const names={ all:'Todos', use:'En uso', bg:'Segundo plano', off:'Desconectados', blocked:'Bloqueados', soon:'Por vencer' };
+  const base=all.filter(match);
+  document.getElementById('chips').innerHTML = Object.keys(names).map(k=>
+    `<button class="chip ${devFilter===k?'on':''}" onclick="setFilter('${k}')">${names[k]}<b>${base.filter(l=>tests[k](devInfo(l))).length}</b></button>`).join('');
+  const sort=document.getElementById('sortBox').value;
+  const list=base.filter(l=>tests[devFilter](devInfo(l))).sort((x,y)=>
+    sort==='name' ? (x.device_label||x.email||'~').localeCompare(y.device_label||y.email||'~')
+    : sort==='expiry' ? (new Date(x.expires_at||8.64e15)-new Date(y.expires_at||8.64e15))
+    : (new Date(y.last_seen_at||0)-new Date(x.last_seen_at||0)));
+  const grid=document.getElementById('devGrid');
+  if(!list.length){ grid.innerHTML='<div class="empty card" style="grid-column:1/-1">No hay dispositivos con este filtro.</div>'; return; }
+  grid.innerHTML='';
+  list.forEach(l=>{
+    const { st, expired }=devInfo(l), col=COLORS[st];
     const outdated = cfg && l.app_version && verLt(l.app_version, cfg.min_version);
     const waitingMs = l.location_requested_at ? Date.now()-new Date(l.location_requested_at).getTime() : 0;
     const noReply = l.location_requested && waitingMs > 180000;
     let loc = (l.last_lat!=null)
-      ? `<a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${l.last_lat},${l.last_lng}">Ver mapa</a><div class="muted">obtenida ${ago(l.location_at)}</div>`
+      ? `<a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${l.last_lat},${l.last_lng}">Ver mapa</a> <span class="muted">· ${ago(l.location_at)}</span>`
       : '<span class="muted">Sin solicitar</span>';
     if (l.location_requested) loc = noReply
-      ? `<span style="color:var(--warn)">Sin respuesta</span><div class="muted">¿desconectado o sin permiso de ubicación?</div>` + (l.last_lat!=null?loc:'')
+      ? `<span style="color:var(--warn)">Sin respuesta</span>` + (l.last_lat!=null?`<div>${loc}</div>`:'')
       : `<span style="color:var(--warn)">⏳ Solicitando…</span>` + (l.last_lat!=null?`<div class="muted">anterior: ${ago(l.location_at)}</div>`:'');
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td><span class="dot" style="background:${COLORS[p]}"></span>${presenceText[p]}<div class="muted">${ago(l.last_seen_at)}</div></td>
-      <td>${l.email?`<b>${esc(l.email)}</b>`:'<span class="muted">—</span>'}</td>
-      <td><input type="text" value="${esc(l.device_label)}" placeholder="Sin nombre" onchange="updateLabel('${l.id}', this.value)" /></td>
-      <td><select onchange="updateTier('${l.id}', this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${l.tier===t?'selected':''}>${t}</option>`).join('')}</select></td>
-      <td><input type="date" value="${l.expires_at?l.expires_at.substring(0,10):''}" onchange="updateExpiry('${l.id}', this.value)" /></td>
-      <td>${l.hardware_id?`<code>${esc(l.hardware_id)}</code>`:'<span class="muted">Sin teléfono</span>'}</td>
-      <td>${loc}</td>
-      <td>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠</span>':''}</td>
-      <td><span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
-          ${!l.is_active&&l.block_reason?`<div class="muted">${esc(l.block_reason)}</div>`:''}</td>
-      <td class="row-actions">
+    const el=document.createElement('div');
+    el.className='dev'; el.style.setProperty('--c',col);
+    el.innerHTML=`
+      <div class="dev-h">
+        <div class="dev-id">
+          <input class="name" type="text" value="${esc(l.device_label)}" placeholder="Sin nombre" onchange="updateLabel('${l.id}', this.value)" />
+          <div class="muted">${l.email?esc(l.email):'Sin correo (licencia por código)'}</div>
+        </div>
+        <span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
+      </div>
+      <div class="dev-st"><span class="dot" style="background:${col}"></span>${st==='blocked'?'Bloqueado':presenceText[st]} <span class="muted">· ${ago(l.last_seen_at)}</span></div>
+      ${!l.is_active&&l.block_reason?`<div class="muted" style="margin-top:6px">Motivo: ${esc(l.block_reason)}</div>`:''}
+      <div class="dev-fields">
+        <div><label>Plan</label><select onchange="updateTier('${l.id}', this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${l.tier===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div><label>Vence</label><input type="date" value="${l.expires_at?l.expires_at.substring(0,10):''}" onchange="updateExpiry('${l.id}', this.value)" /></div>
+        <div><label>App</label><div>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠ desactualizada</span>':''}</div></div>
+        <div><label>Ubicación</label><div>${loc}</div></div>
+        <div style="grid-column:1/-1"><label>Código</label>${l.hardware_id?`<code>${esc(l.hardware_id)}</code>`:'<span class="muted">Sin teléfono vinculado</span>'}</div>
+      </div>
+      <div class="row-actions">
         <button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>
         <button class="btn-${l.is_active?'danger':'primary'}" onclick="toggleActive('${l.id}', ${!l.is_active})">${l.is_active?'Bloquear':'Activar'}</button>
         ${l.email&&l.hardware_id?`<button class="btn-ghost" title="Desvincula el teléfono (cambio de celular)" onclick="releaseDevice('${l.id}')">Liberar cel</button>`:''}
-        <button class="btn-ghost" onclick="deleteLicense('${l.id}')">Eliminar</button>
-      </td>`;
-    tbody.appendChild(tr);
+        <button class="btn-ghost" style="margin-left:auto" onclick="deleteLicense('${l.id}')">Eliminar</button>
+      </div>`;
+    grid.appendChild(el);
   });
 }
 async function upd(id, patch){
