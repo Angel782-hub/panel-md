@@ -116,6 +116,7 @@
   .chip.on b{background:rgba(0,0,0,.18);color:inherit}
   .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;align-items:start}
   .dev{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+  .dev.dirty{border-color:var(--accent);border-left-color:var(--c)}
   .dev-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
   .dev-id{flex:1;min-width:0}
   .dev-id .name{font-weight:700;font-size:15px;background:transparent;border-color:transparent;padding:4px 8px;margin:0 0 2px -8px;width:calc(100% + 8px)}
@@ -140,6 +141,10 @@
   .seg button.on{background:var(--accent);color:var(--accent-ink)}
   .seg button:not(.on):hover{color:var(--text);background:var(--panel2)}
   .sum{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel2);border-radius:8px;padding:8px 10px}
+  .exp-box{display:flex;flex-direction:column;gap:8px}
+  .seg.sm button{padding:4px 4px;font-size:12px}
+  .dirty-note{color:var(--accent);font-size:12px;font-weight:700;display:none}
+  .dev.dirty .dirty-note{display:inline}
 </style>
 </head>
 <body>
@@ -196,7 +201,7 @@
       <section class="view" id="v-dispositivos">
         <div class="toolbar">
           <input id="searchBox" type="text" placeholder="Buscar por correo, nombre o código…" oninput="renderTable()" />
-          <select id="sortBox" onchange="renderTable()">
+          <select id="sortBox" onchange="orderRank=null;renderTable()">
             <option value="recent">Última conexión</option>
             <option value="name">Nombre (A-Z)</option>
             <option value="expiry">Vence primero</option>
@@ -266,6 +271,11 @@
             <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn-primary" onclick="activateDevice()">Activar dispositivo</button><span id="actMsg" class="muted"></span></div>
           </div>
         </div>
+        <div class="card" style="max-width:640px">
+          <h3>Ubicación de dispositivos</h3>
+          <p class="muted" style="margin:0 0 12px">Apagada por defecto. Al activarla se muestran, en todos los dispositivos, el campo Ubicación, el botón «📍 Ubicación» y la pestaña Mapa. Se guarda en este navegador.</p>
+          <label><input id="cfgShowLoc" type="checkbox" onchange="setShowLoc(this.checked)" />Mostrar la ubicación de los dispositivos</label>
+        </div>
       </section>
 
     </main>
@@ -283,6 +293,21 @@ const REFRESH_MS = 5000;
 const COLORS = { use:'#3ecf8e', bg:'#f59e0b', off:'#6b7280', blocked:'#ef4444' };
 
 let licenses = [], cfg = null, map = null, layer = null, fitted = false, timer = null;
+
+/* ---------- visibilidad de ubicación (se guarda en este navegador; apagada por defecto) ---------- */
+let showLoc = false;
+try{ showLoc = localStorage.getItem('md_show_loc')==='1'; }catch(e){}
+function applyLoc(){
+  const b=document.querySelector('.nav button[data-v="mapa"]'); if(b) b.style.display=showLoc?'':'none';
+  const c=document.getElementById('cfgShowLoc'); if(c) c.checked=showLoc;
+}
+function setShowLoc(v){
+  showLoc=!!v;
+  try{ localStorage.setItem('md_show_loc', showLoc?'1':'0'); }catch(e){}
+  applyLoc();
+  if(!showLoc && document.getElementById('v-mapa').classList.contains('active')) nav('ajustes');
+  renderTable();
+}
 
 /* ---------- utilidades ---------- */
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -339,10 +364,11 @@ async function logout(){
 }
 function showApp(){
   document.getElementById('login').style.display='none'; document.getElementById('app').style.display='block';
-  initMap(); nav((location.hash||'#resumen').slice(1));
+  applyLoc(); initMap(); nav((location.hash||'#resumen').slice(1));
 }
 function nav(v){
   if(!document.getElementById('v-'+v)) v='resumen';
+  if(v==='mapa' && !showLoc) v='resumen';
   document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id==='v-'+v));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   document.getElementById('viewTitle').textContent=document.querySelector(`.nav button[data-v="${v}"] span`).textContent;
@@ -455,7 +481,66 @@ function renderPending(term){
     pg.appendChild(el);
   });
 }
-let devFilter='all';
+
+/* ---------- edición de dispositivos (borrador + botón Guardar) ---------- */
+const devDraft = {};   // cambios sin guardar por licencia
+const fmtDate = dt => dt.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});
+const baseDate = l => l.expires_at ? l.expires_at.substring(0,10) : '';
+const baseDraft = l => ({ label:l.device_label||'', tier:l.tier, date:baseDate(l), mode:'date', days:'' });
+function ensureDraft(id){
+  if(!devDraft[id]){ const l=licenses.find(x=>x.id===id); devDraft[id]=baseDraft(l||{}); }
+  return devDraft[id];
+}
+// Fecha de vencimiento resultante según el modo (calendario o días desde hoy)
+function expResult(d){
+  if(d.mode==='days'){
+    const n=parseInt(d.days,10); if(!(n>0)) return null;
+    const t=new Date(Date.now()+n*86400000); return { iso:t.toISOString(), date:t, n };
+  }
+  if(!d.date) return null;
+  const t=new Date(d.date+'T23:59:59Z'); return { iso:t.toISOString(), date:t };
+}
+function expChanged(l,d){
+  if(d.mode==='days') return parseInt(d.days,10)>0;
+  return !!d.date && d.date!==baseDate(l);
+}
+function isDirty(l,d){
+  return (d.label||'').trim()!==(l.device_label||'') || d.tier!==l.tier || expChanged(l,d);
+}
+function expSummary(d){
+  const e=expResult(d);
+  if(d.mode==='days') return e ? `Vencerá el ${fmtDate(e.date)} (hoy + ${e.n} d)` : 'Escribe los días o elige uno rápido';
+  if(!e) return 'Sin fecha de vencimiento';
+  const n=Math.ceil((e.date-Date.now())/86400000);
+  return `Vence el ${fmtDate(e.date)} · ${n>0?`faltan ${n} d`:'ya expiró'}`;
+}
+function updateDirty(id){
+  const l=licenses.find(x=>x.id===id), d=devDraft[id]; if(!l||!d) return;
+  const dirty=isDirty(l,d);
+  const card=document.getElementById('dev-'+id); if(card) card.classList.toggle('dirty',dirty);
+  const sv=document.getElementById('save-'+id); if(sv) sv.disabled=!dirty;
+  const ds=document.getElementById('discard-'+id); if(ds) ds.style.display=dirty?'':'none';
+  const sm=document.getElementById('dsum-'+id); if(sm) sm.textContent=expSummary(d);
+}
+function devEdit(id,field,value){ ensureDraft(id)[field]=value; updateDirty(id); }
+function devSetMode(id,mode){
+  const d=ensureDraft(id);
+  if(d.mode===mode) return;
+  if(mode==='date'){ const e=expResult(d); if(d.mode==='days' && e) d.date=e.iso.substring(0,10); }
+  d.mode=mode; renderTable();
+}
+function devSetDays(id,n){ const d=ensureDraft(id); d.mode='days'; d.days=String(n); renderTable(); }
+function devDiscard(id){ delete devDraft[id]; renderTable(); }
+async function saveDevice(id){
+  const l=licenses.find(x=>x.id===id), d=devDraft[id]; if(!l||!d) return;
+  const patch={ device_label:d.label.trim()||null, tier:d.tier };
+  if(expChanged(l,d)){ const e=expResult(d); if(e) patch.expires_at=e.iso; }
+  const sv=document.getElementById('save-'+id); if(sv){ sv.disabled=true; sv.textContent='Guardando…'; }
+  const ok=await upd(id,patch);
+  if(ok) delete devDraft[id]; else renderTable();
+}
+
+let devFilter='all', orderRank=null, orderKey='';
 function goFilter(f){ devFilter=f; nav('dispositivos'); renderTable(); }
 function setFilter(f){ devFilter=f; renderTable(); }
 function devInfo(l){
@@ -476,15 +561,23 @@ function renderTable(){
   document.getElementById('chips').innerHTML = Object.keys(names).map(k=>
     `<button class="chip ${devFilter===k?'on':''}" onclick="setFilter('${k}')">${names[k]}<b>${base.filter(l=>tests[k](devInfo(l))).length}</b></button>`).join('');
   const sort=document.getElementById('sortBox').value;
+  // El orden se calcula solo al cargar o al cambiar el criterio; después queda fijo
+  if(!orderRank || orderKey!==sort){
+    const cmp=(x,y)=>
+      sort==='name' ? (x.device_label||x.email||'~').localeCompare(y.device_label||y.email||'~')
+      : sort==='expiry' ? (new Date(x.expires_at||8.64e15)-new Date(y.expires_at||8.64e15))
+      : (new Date(y.last_seen_at||0)-new Date(x.last_seen_at||0));
+    orderRank={}; [...all].sort(cmp).forEach((l,i)=>orderRank[l.id]=i); orderKey=sort;
+  }
   const list=base.filter(l=>tests[devFilter](devInfo(l))).sort((x,y)=>
-    sort==='name' ? (x.device_label||x.email||'~').localeCompare(y.device_label||y.email||'~')
-    : sort==='expiry' ? (new Date(x.expires_at||8.64e15)-new Date(y.expires_at||8.64e15))
-    : (new Date(y.last_seen_at||0)-new Date(x.last_seen_at||0)));
+    (orderRank[x.id]??1e9)-(orderRank[y.id]??1e9));
   const grid=document.getElementById('devGrid');
   if(!list.length){ grid.innerHTML='<div class="empty card" style="grid-column:1/-1">No hay dispositivos con este filtro.</div>'; return; }
   grid.innerHTML='';
   list.forEach(l=>{
     const { st, expired }=devInfo(l), col=COLORS[st];
+    const d = devDraft[l.id] || baseDraft(l);
+    const dirty = isDirty(l,d);
     const outdated = cfg && l.app_version && verLt(l.app_version, cfg.min_version);
     const waitingMs = l.location_requested_at ? Date.now()-new Date(l.location_requested_at).getTime() : 0;
     const noReply = l.location_requested && waitingMs > 180000;
@@ -495,11 +588,12 @@ function renderTable(){
       ? `<span style="color:var(--warn)">Sin respuesta</span>` + (l.last_lat!=null?`<div>${loc}</div>`:'')
       : `<span style="color:var(--warn)">⏳ Solicitando…</span>` + (l.last_lat!=null?`<div class="muted">anterior: ${ago(l.location_at)}</div>`:'');
     const el=document.createElement('div');
-    el.className='dev'; el.style.setProperty('--c',col);
+    el.id='dev-'+l.id;
+    el.className='dev'+(dirty?' dirty':''); el.style.setProperty('--c',col);
     el.innerHTML=`
       <div class="dev-h">
         <div class="dev-id">
-          <input class="name" type="text" value="${esc(l.device_label)}" placeholder="Sin nombre" onchange="updateLabel('${l.id}', this.value)" />
+          <input class="name" type="text" value="${esc(d.label)}" placeholder="Sin nombre" oninput="devEdit('${l.id}','label',this.value)" />
           <div class="muted">${l.email?esc(l.email):'Sin correo (licencia por código)'}</div>
         </div>
         <span class="pill ${l.is_active&&!expired?'pill-ok':'pill-off'}">${!l.is_active?'Bloqueada':expired?'Expirada':'Activa'}</span>
@@ -507,14 +601,30 @@ function renderTable(){
       <div class="dev-st"><span class="dot" style="background:${col}"></span>${st==='blocked'?'Bloqueado':presenceText[st]} <span class="muted">· ${ago(l.last_seen_at)}</span></div>
       ${!l.is_active&&l.block_reason?`<div class="muted" style="margin-top:6px">Motivo: ${esc(l.block_reason)}</div>`:''}
       <div class="dev-fields">
-        <div><label>Plan</label><select onchange="updateTier('${l.id}', this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${l.tier===t?'selected':''}>${t}</option>`).join('')}</select></div>
-        <div><label>Vence</label><input type="date" value="${l.expires_at?l.expires_at.substring(0,10):''}" onchange="updateExpiry('${l.id}', this.value)" /></div>
+        <div><label>Plan</label><select onchange="devEdit('${l.id}','tier',this.value)">${['free','pro','pro_plus'].map(t=>`<option value="${t}" ${d.tier===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div><label>App</label><div>${esc(l.app_version)||'—'}${outdated?' <span title="Por debajo de la versión mínima" style="color:var(--warn)">⚠ desactualizada</span>':''}</div></div>
-        <div><label>Ubicación</label><div>${loc}</div></div>
+        <div style="grid-column:1/-1" class="exp-box">
+          <label>Vencimiento</label>
+          <div class="seg sm">
+            <button class="${d.mode==='date'?'on':''}" onclick="devSetMode('${l.id}','date')">📅 Calendario</button>
+            <button class="${d.mode==='days'?'on':''}" onclick="devSetMode('${l.id}','days')">🔢 Días desde hoy</button>
+          </div>
+          ${d.mode==='date'
+            ? `<input type="date" value="${esc(d.date)}" oninput="devEdit('${l.id}','date',this.value)" onchange="devEdit('${l.id}','date',this.value)" />`
+            : `<div class="seg sm">${[7,15,30,90,365].map(n=>`<button class="${String(n)===String(d.days)?'on':''}" onclick="devSetDays('${l.id}',${n})">${n} d</button>`).join('')}</div>
+               <input type="number" min="1" value="${esc(d.days)}" placeholder="…o escribe los días" oninput="devEdit('${l.id}','days',this.value)" />`}
+          <div class="sum" id="dsum-${l.id}">${expSummary(d)}</div>
+        </div>
+        ${showLoc?`<div style="grid-column:1/-1"><label>Ubicación</label><div>${loc}</div></div>`:''}
         <div style="grid-column:1/-1"><label>Código</label>${l.hardware_id?`<code>${esc(l.hardware_id)}</code>`:'<span class="muted">Sin teléfono vinculado</span>'}</div>
       </div>
       <div class="row-actions">
-        <button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>
+        <button class="btn-primary" id="save-${l.id}" onclick="saveDevice('${l.id}')" ${dirty?'':'disabled'}>💾 Guardar cambios</button>
+        <button class="btn-ghost" id="discard-${l.id}" style="${dirty?'':'display:none'}" onclick="devDiscard('${l.id}')">Descartar</button>
+        <span class="dirty-note">● Sin guardar</span>
+      </div>
+      <div class="row-actions">
+        ${showLoc?`<button class="btn-ghost" onclick="requestLocation('${l.id}')" ${l.location_requested&&!noReply?'disabled':''}>📍 ${noReply?'Reintentar':'Ubicación'}</button>`:''}
         <button class="btn-${l.is_active?'danger':'primary'}" onclick="toggleActive('${l.id}', ${!l.is_active})">${l.is_active?'Bloquear':'Activar'}</button>
         ${l.email&&l.hardware_id?`<button class="btn-ghost" title="Desvincula el teléfono (cambio de celular)" onclick="releaseDevice('${l.id}')">Liberar cel</button>`:''}
         <button class="btn-ghost" style="margin-left:auto" onclick="deleteLicense('${l.id}')">Eliminar</button>
@@ -524,8 +634,9 @@ function renderTable(){
 }
 async function upd(id, patch){
   const { error } = await sb.from('user_licenses').update(patch).eq('id', id);
-  if(error) return alert('Error: '+error.message);
+  if(error){ alert('Error: '+error.message); return false; }
   await loadLicenses();
+  return true;
 }
 async function toggleActive(id, newValue){
   if(newValue===false){
@@ -556,13 +667,11 @@ async function releaseDevice(id){
   await upd(id,{ hardware_id:null });
 }
 const requestLocation = id => upd(id,{ location_requested:true, location_requested_at:new Date().toISOString() });
-const updateTier  = (id,v)=>upd(id,{ tier:v });
-const updateLabel = (id,v)=>upd(id,{ device_label:v.trim()||null });
-function updateExpiry(id,d){ if(!d) return; return upd(id,{ expires_at:new Date(d+'T23:59:59Z').toISOString() }); }
 async function deleteLicense(id){
   if(!confirm('¿Eliminar esta licencia? El dispositivo quedará sin activar y la app se bloqueará.')) return;
   const { error } = await sb.from('user_licenses').delete().eq('id', id);
   if(error) return alert('Error: '+error.message);
+  delete devDraft[id];
   await loadLicenses();
 }
 async function activateDevice(){
