@@ -213,7 +213,7 @@
       </section>
 
       <section class="view" id="v-pendientes">
-        <p class="muted" style="margin:0 0 16px;max-width:760px">Usuarios que se registraron en la app con correo y contraseña. Tú decides el plan y los días de cada uno; sin tu aprobación no pueden usar la app. Al pulsar «Activar» su app entra sola en unos segundos.</p>
+        <p class="muted" style="margin:0 0 16px;max-width:760px">Usuarios que se registraron en la app con correo y contraseña. Tú decides el plan y los días de cada uno; sin tu aprobación no pueden usar la app. Al pulsar «Activar» su app entra sola en unos segundos. «Rechazar» elimina la cuenta: la persona puede volver a registrarse y aparecerá de nuevo aquí.</p>
         <div id="pgrid" class="devgrid"></div>
         <div id="pendingEmpty" class="card empty" style="display:none;padding:56px 20px">
           <div style="font-size:34px;margin-bottom:8px">✅</div>
@@ -656,24 +656,36 @@ async function approveAccount(id){
                  expires_at:new Date(Date.now()+days*86400000).toISOString(), block_reason:null });
   delete draft[id];
 }
+
+/* ---------- eliminar / rechazar / liberar (funciones seguras del servidor) ---------- */
+// Borra licencia + cuenta y libera el teléfono: la persona puede volver a registrarse.
+async function adminDelete(id){
+  const { error } = await sb.rpc('admin_delete_license', { p_license_id: id });
+  if(error){ alert('Error: '+error.message); return false; }
+  delete devDraft[id]; delete draft[id];
+  await loadLicenses();
+  return true;
+}
 async function rejectAccount(id){
-  const reason = prompt('Motivo del rechazo (se mostrará al usuario, opcional):','');
-  if(reason===null) return;
-  await upd(id,{ is_active:false, pending:false, block_reason:reason.trim()||null });
-  delete draft[id];
+  const l = licenses.find(x=>x.id===id) || {};
+  const quien = l.email || 'esta cuenta';
+  if(!confirm('¿Rechazar a '+quien+'?\n\nSe elimina la cuenta y ese teléfono queda libre: la persona podrá volver a registrarse y aparecerá de nuevo en Pendientes.')) return;
+  await adminDelete(id);
+}
+async function deleteLicense(id){
+  const l = licenses.find(x=>x.id===id) || {};
+  const quien = l.email || l.device_label || 'esta licencia';
+  if(!confirm('¿Eliminar a '+quien+'?\n\nSe borra la licencia y su cuenta, y ese teléfono podrá registrarse de nuevo desde cero.')) return;
+  await adminDelete(id);
 }
 async function releaseDevice(id){
   if(!confirm('¿Liberar el teléfono de esta cuenta? Se vinculará al próximo teléfono donde inicie sesión.')) return;
-  await upd(id,{ hardware_id:null });
-}
-const requestLocation = id => upd(id,{ location_requested:true, location_requested_at:new Date().toISOString() });
-async function deleteLicense(id){
-  if(!confirm('¿Eliminar esta licencia? El dispositivo quedará sin activar y la app se bloqueará.')) return;
-  const { error } = await sb.from('user_licenses').delete().eq('id', id);
-  if(error) return alert('Error: '+error.message);
-  delete devDraft[id];
+  const { error } = await sb.rpc('admin_release_device', { p_license_id: id });
+  if(error){ alert('Error: '+error.message); return; }
   await loadLicenses();
 }
+
+const requestLocation = id => upd(id,{ location_requested:true, location_requested_at:new Date().toISOString() });
 async function activateDevice(){
   const msg=document.getElementById('actMsg');
   const code=normalizeCode(document.getElementById('actCode').value);
